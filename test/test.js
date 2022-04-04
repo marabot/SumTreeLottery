@@ -20,14 +20,13 @@ contract('SumTreeLottery' , accounts =>{
       
     })
 
-    it('should return what vaguely look like random numbers', async ()=>{
+    it('should return what vaguely look like random numbers (just a timeStamp)', async ()=>{
         let numbers = [];
         for(let i = 0 ;i< 5 ;i++){
             let requestId = await Rng.getRNGNumber();
             let reqIdNum = web3.utils.hexToNumber(web3.utils.bytesToHex(requestId));
             let num = await Rng.getNumberFromID(web3.eth.abi.encodeParameter('uint256', reqIdNum));
-            numbers[i]=num;
-            await time.increase( 60*3);
+            numbers[i]=num;            
             console.log('num : ' + num);
         }
     
@@ -47,6 +46,8 @@ contract('SumTreeLottery' , accounts =>{
             let length = await Lot.lotteryLength();
             console.log("1 :" + length);
 
+
+            // not owner try to change lottery length
             await expectRevert(
                 Lot.setLotteryLength(200,{from:trader2}),
                'Ownable: caller is not the owner'
@@ -54,7 +55,8 @@ contract('SumTreeLottery' , accounts =>{
 
             length = await Lot.lotteryLength();
             console.log("2 :" +length);
-
+           
+            // owner try to change lottery length
             await Lot.setLotteryLength(100, {from:owny});
 
             length = await Lot.lotteryLength();
@@ -62,10 +64,10 @@ contract('SumTreeLottery' , accounts =>{
             assert(length.toNumber()==100);
            
        // assert(cLot.endtime == Date.now() + Date.h);
-    }, 'init failed');
+    }, 'init owner failed');
   
 
-    /// test is passing if run only this, but not when all tests are launched
+    /// test is passing if run only this, but not when all tests are launched because of blockhchain time shifting in other test)
     it('should have create lottery at creation', async ()=>{
      
         const cLot = await Lot.getCurrentLottery();
@@ -84,90 +86,90 @@ contract('SumTreeLottery' , accounts =>{
         console.log(Date(currentTimePlus1H.getTime()));
 
 
-        /// +3 et - 3 pour comparer endtime car on n'a pas la date de creation précise
+        /// +3 min and - 3 min to compare endtime because we don't have the exact time of lottery creation
         assert(cLotEndtime < currentTimePlus1H.getTime()/1000+3 && cLotEndtime> currentTimePlus1H.getTime()/1000-3,"End of the lottery incorrect");
         assert(cLot.sumTree_key == web3.eth.abi.encodeParameter('int256', String(0)));
-       // assert(cLot.endtime == Date.now() + Date.h);
-    }, 'init failed');
+      
+    }, 'lottery creation failed');
 
 
     it('should wage current lottery', async ()=>{
       
         const depositvalue= web3.utils.toWei('14');
 
+        // a first wager deposit
         await Lot.deposit({from:trader1,value:depositvalue});
         let stake = await Lot.getStake(trader1);
         assert(web3.utils.fromWei(stake)==14, "1st deposit value wrong");
         console.log(web3.utils.fromWei(stake));
        
+        // a second wager deposit
         await Lot.deposit({from:trader1,value:depositvalue});    
         stake = await Lot.getStake(trader1); 
-        assert(web3.utils.fromWei(stake)==28, "2nd deposit value wrong");
-    
-        console.log(web3.utils.fromWei(stake));
-
-        console.log(stake);
-   
-        const cLot = await Lot.getCurrentLottery();
-        console.log(cLot.endTime);      
+        assert(web3.utils.fromWei(stake)==28, "2nd deposit value wrong");   
         
-    }, 'wage failed');
+        
+    }, 'deposit failed');
 
 
     it('should choose a winner and send prizepool', async ()=>{
       
-        const depositvalue= web3.utils.toWei('10');
-        const depositvalue2= web3.utils.toWei('20');
         
-        await Lot.deposit({from:trader1,value:depositvalue}); 
-        await Lot.deposit({from:trader2,value:depositvalue2});
-
         let lotBalance= await  web3.eth.getBalance(Lot.address);
         let trader1Balance = await web3.eth.getBalance(trader1);
-        console.log("lot :" + Math.round(web3.utils.fromWei(lotBalance)));
-        console.log("trader1 :" + Math.round(web3.utils.fromWei(trader1Balance)));
-
-        const cLot = await Lot.getCurrentLottery();
-        const endtime = cLot.endTime;
-        //console.log(endtime.toNumber());
-        let lat= await time.latest();
-        console.log("endtime : " + endtime);
-        console.log(lat.toNumber());
-    
-        let currentTimePlus10min= new Date();
-        currentTimePlus10min.setTime(Date.now() + 60*60*1000);
-        await time.increase( 60*60*3);
-        
-       let betRet3 =  await Lot.deposit({from:trader3,value:depositvalue2});
-       console.log('betRet3 :' + web3.utils.hexToNumber(web3.utils.bytesToHex(betRet3)));
-       //let betRet3_1 = await web3.utils.toAscii(betRet3[0]);
-
-
-        lotBalance= await  web3.eth.getBalance(Lot.address);
-        trader1Balance = await web3.eth.getBalance(trader1);
-
         let trader2Balance = await web3.eth.getBalance(trader2);
         console.log("lot :" + Math.round(web3.utils.fromWei(lotBalance)));
         console.log("trader1 :" + Math.round(web3.utils.fromWei(trader1Balance)));
         console.log("trader2 :" + Math.round(web3.utils.fromWei(trader2Balance)));
+        const depositvalue= web3.utils.toWei('10');
+        const depositvalue2= web3.utils.toWei('20');
 
-        let stake = await Lot.getStake(trader3); 
-        console.log(web3.utils.fromWei(stake));
-        // assert(web3.utils.fromWei(stake)==28, "2nd deposit value wrong");
-        lat= await time.latest();
+        // 2 wagers deposit
+        await Lot.deposit({from:trader1,value:depositvalue}); 
+        await Lot.deposit({from:trader2,value:depositvalue2});
+
+       
+        let lotBalanceAfter= await  web3.eth.getBalance(Lot.address);
+        let trader1BalanceAfter = await web3.eth.getBalance(trader1);
+        let trader2BalanceAfter = await web3.eth.getBalance(trader2);
+
+        console.log("lot :" + Math.round(web3.utils.fromWei(lotBalanceAfter)));
+        console.log("trader1 :" + Math.round(web3.utils.fromWei(trader1BalanceAfter)));
+        console.log("trader2 :" + Math.round(web3.utils.fromWei(trader2BalanceAfter)));
+
+        assert(Math.round(web3.utils.fromWei(lotBalanceAfter))==Math.round(web3.utils.fromWei(lotBalance)) +30);
+        assert(Math.round(web3.utils.fromWei(trader1BalanceAfter))==Math.round(web3.utils.fromWei(trader1Balance)) -10);
+        assert(Math.round(web3.utils.fromWei(trader2BalanceAfter))==Math.round(web3.utils.fromWei(trader2Balance)) -20);
+
+        /* Display lottery endtime timestamp and latest block timestamp
+        const cLot = await Lot.getCurrentLottery();
+        const endtime = cLot.endTime;      
+        let lat= await time.latest();
+        console.log("endtime : " + endtime);
         console.log(lat.toNumber());
-        console.log("done");
+        */ 
+
+        let currentTimePlus10min= new Date();
+        currentTimePlus10min.setTime(Date.now() + 60*60*1000);
+        await time.increase( 60*60*3);
         
-    }, 'wage failed');
+        lotBalance= await  web3.eth.getBalance(Lot.address);
+        trader1Balance = await web3.eth.getBalance(trader1);
+        trader2Balance = await web3.eth.getBalance(trader2);
+     
+        // 3rd deposit, trigger draw, sending prize, and create new lottery
+        let betRet3 =  await Lot.deposit({from:trader3,value:depositvalue2});
+        // index of the winner  
+       
+        lotBalanceAfter= await  web3.eth.getBalance(Lot.address);
+        trader1BalanceAfter = await web3.eth.getBalance(trader1);
+        trader2BalanceAfter = await web3.eth.getBalance(trader2);
+
+       
+        assert(Math.round(web3.utils.fromWei(lotBalanceAfter))==Math.round(web3.utils.fromWei(lotBalance)) - 30 + web3.utils.fromWei(depositvalue2));
+       
+    }, 'draw and sending prize failed');
 }
-
-
 
 );
 
-
-
-function numStringToBytes32(num) { 
-    var bn = new BN(num).toTwos(256);
-    return padToBytes32(bn.toString(16));
- }
